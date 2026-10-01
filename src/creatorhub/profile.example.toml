@@ -1,0 +1,34 @@
+# Copy to ~/.creatorhub/profile.toml (or run `creatorhub init`) and make it yours.
+# This is the "who am I" that every trend is scored against.
+
+name = "Daniel"
+bio = "CS + math student at UH, SWE intern (JPMorgan, NASA), NSBE marketing lead. Makes content about tech careers, building projects, and student life."
+audience = "College students and early-career engineers, especially Black students in STEM"
+voice = "Hype but honest, practical, shows the real process"
+platforms = ["youtube", "tiktok", "instagram", "linkedin"]
+
+# Your core niches. Keywords are what the watcher matches against.
+[[niches]]
+name = "Tech careers & internships"
+keywords = ["software engineering internship", "swe intern", "new grad", "leetcode", "tech interview", "big tech"]
+
+[[niches]]
+name = "Building with AI"
+keywords = ["ai agent", "mcp server", "claude", "cursor", "vibe coding", "side project", "indie hacker"]
+
+[[niches]]
+name = "Space & NASA"
+keywords = ["nasa", "artemis", "spacex", "iss", "space tech"]
+
+# Where to look. Keep subreddits/feeds tight; noise kills the signal.
+[sources]
+subreddits = ["cscareerquestions", "csMajors", "learnprogramming", "SideProject", "ClaudeAI", "space"]
+rss_feeds = ["https://hnrss.org/frontpage"]
+youtube_region = "US"
+
+[alerts]
+# 0-100. Only trends scoring at or above this ping you.
+min_score = 65
+# Also flag "adjacent niche" trends you don't cover yet but could.
+adjacent_niches = true
+max_alerts_per_scan = 5
