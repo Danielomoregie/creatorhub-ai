@@ -2,9 +2,21 @@
 
 Your always-on content partner. CreatorHub runs in the background, watches the places your audience
 hangs out, and pings you when something takes off in your niche or when a **new niche** you could
-own starts trending. It also plugs into Claude as an **MCP server**, so you can ask
-*"what popped up today and what should I post?"* and get ideas grounded in live trends, then push
-the ones you like to Notion.
+own starts trending. It learns from **your own YouTube stats** which niches land with your audience,
+sends a **daily 8am digest** to your phone, and has a **web dashboard** for trends, alerts and an idea
+board. It also plugs into Claude as an **MCP server**, so you can ask *"what popped up today and what
+should I post?"* and push the ideas you like to Notion.
+
+**New here? Follow [SETUP.md](SETUP.md)**: a step-by-step VS Code guide.
+
+| | |
+|---|---|
+| `creatorhub dashboard` | Web dashboard at http://127.0.0.1:8765: Today, Trends, Ideas board, My stats, Settings |
+| `creatorhub watch` | Background watcher: scans hourly, sends alerts and the daily digest |
+| `creatorhub serve` | MCP server for Claude Desktop / Claude Code |
+| `creatorhub scan` | One scan, printed to the terminal |
+| `creatorhub digest [--preview]` | Today's top 3 trends + 3 ideas, sent to your phone/Discord |
+| `creatorhub stats` | Pull your YouTube channel stats and see which niches beat your median |
 
 ```
  ┌──────────── creatorhub watch (always running) ────────────┐
@@ -14,16 +26,19 @@ the ones you like to Notion.
  │  keyword + momentum + freshness score (free, every item)  │
  │        │  top 25 new candidates                           │
  │        ▼                                                  │
+ │  × your channel's niche boost (from `creatorhub stats`)   │
+ │        │                                                  │
  │  Claude: core / adjacent-niche / noise                    │
  │        │                                                  │
  │        ▼                                                  │
- │  alerts ──► desktop · phone (ntfy) · Discord              │
+ │  alerts + 8am digest ──► desktop · phone (ntfy) · Discord │
  └────────┬──────────────────────────────────────────────────┘
           │ shared SQLite (~/.creatorhub/creatorhub.db)
- ┌────────▼──────── creatorhub serve (MCP) ──────────────────┐
- │  get_alerts · get_trending · scan_now · generate_ideas    │
- │  save_idea · list_ideas · send_idea_to_notion · add_niche │
- └───────────────────────────────────────────────────────────┘
+ ┌────────▼──────── creatorhub serve (MCP) ──────────────────┐   ┌── creatorhub dashboard ──┐
+ │  get_alerts · get_trending · scan_now · generate_ideas    │   │  React + TypeScript UI   │
+ │  save_idea · list_ideas · send_idea_to_notion · add_niche │   │  on a local JSON API     │
+ │  get_digest · get_my_performance                          │   │  (127.0.0.1 only)        │
+ └───────────────────────────────────────────────────────────┘   └──────────────────────────┘
           ▲
    Claude Desktop / Claude Code / any MCP client
 ```
@@ -99,7 +114,12 @@ get filled automatically.
 ## Development
 
 ```bash
-pytest
+pytest                       # Python tests
+cd dashboard && npm run dev  # UI with hot reload at :5173 (run `creatorhub dashboard` alongside for the API)
+npm run build                # type-check + production build into dashboard/dist
 ```
+
+Layout: `src/creatorhub/` (Python: sources, scoring, watcher, service, MCP server, API) and
+`dashboard/` (React + TypeScript + Vite).
 
 See [ROADMAP.md](ROADMAP.md) for where this goes next.

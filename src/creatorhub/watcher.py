@@ -6,7 +6,9 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-from . import notify
+from datetime import datetime, timezone
+
+from . import notify, service
 from .config import Settings, load_profile
 from .llm import Brain
 from .models import Alert, Profile
@@ -39,8 +41,10 @@ def scan(settings: Settings, store: Store, profile: Profile | None = None,
     known = store.known_trend_ids([i.id for i in items])
     result.new = len(items) - len(known)
 
+    perf = service.load_performance(store)
+    multipliers = perf.multipliers() if perf else None
     for item in items:
-        score_item(item, profile, previous=store.last_engagement(item.id))
+        score_item(item, profile, previous=store.last_engagement(item.id), niche_multipliers=multipliers)
 
     # Only spend Claude calls on fresh, promising items we haven't judged yet.
     already_alerted = store.alerted_trend_ids()
@@ -86,6 +90,7 @@ def scan(settings: Settings, store: Store, profile: Profile | None = None,
         if send_notifications:
             notify.send(alert, settings)
 
+    store.set_kv("last_scan", datetime.now(timezone.utc).isoformat())
     log.info("scan: fetched=%d new=%d judged=%d alerts=%d", result.fetched, result.new, result.judged, len(result.alerts))
     return result
 
@@ -98,4 +103,10 @@ def run_forever(settings: Settings) -> None:
             scan(settings, store)
         except Exception:
             log.exception("scan crashed; will retry next interval")
+        try:
+            if service.digest_due(settings, store):
+                service.send_digest(settings, store)
+                log.info("daily digest sent")
+        except Exception:
+            log.exception("digest failed")
         time.sleep(settings.scan_interval_minutes * 60)

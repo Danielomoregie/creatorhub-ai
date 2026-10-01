@@ -65,7 +65,8 @@ class Brain:
         return batch.assessments if batch else []
 
     def generate_ideas(self, profile: Profile, trends: list[dict], count: int = 3,
-                       platform: str | None = None, extra: str | None = None) -> list[ContentIdea]:
+                       platform: str | None = None, extra: str | None = None,
+                       performance: str | None = None) -> list[ContentIdea]:
         trend_text = "\n".join(
             f"- [{t['id']}] ({t['source']}, niche: {t.get('matched_niche') or '?'}) {t['title']} {t['url']}"
             for t in trends
@@ -76,6 +77,8 @@ class Brain:
             + ". Ground them in these live trends where it makes sense, and cite the trend ids you used "
               "in source_trend_ids.\n\n"
             f"Trends:\n{trend_text}"
+            + (f"\n\nHow the creator's own videos have performed (lean into what works):\n{performance}"
+               if performance else "")
             + (f"\n\nExtra direction from the creator: {extra}" if extra else "")
         )
         batch = self._parse(profile, prompt, IdeaBatch, effort="medium")

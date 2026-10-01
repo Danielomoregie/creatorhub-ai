@@ -11,20 +11,24 @@ v0.1 here rebuilds the brain of that as a personal, always-on agent. Below is wh
 - Alerts to desktop, phone (ntfy.sh), Discord; no duplicate alerts
 - MCP server: alerts, trends, idea generation, backlog, Notion export, `add_niche`, `weekly_plan` prompt
 
+## Shipped in v0.2
+- **Dashboard** (React + TypeScript): Today, Trends (filter by niche / new-niche openings), Ideas board
+  (generate → plan → made, one-click Notion), My stats, Settings (niches + connection status)
+- **Daily digest** at 8am: top 3 trends + 3 fresh ideas to phone/Discord/desktop
+- **Learns from your YouTube channel**: per-niche views vs your median boost trend scores (bounded 0.8-1.25x)
+  and are fed into idea prompts
+
 ## Next up (highest leverage first)
-1. **Learn from your own performance.** Pull your channel stats (YouTube Analytics, TikTok/IG via their APIs)
-   and feed "what worked for *me*" into scoring and idea prompts. This is the moat: generic trend tools exist,
-   but none of them know your audience's reaction.
+1. **More of your stats.** YouTube Analytics (OAuth) for retention and CTR, which predict better than views;
+   then TikTok and Instagram. Today we use public view counts only.
 2. **Feedback loop on alerts.** 👍/👎 on each alert (Discord buttons or an MCP tool) to tune keyword weights and
    the alert threshold automatically. Right now the threshold is a number you guess.
 3. **Trend clustering.** Group items about the same story across sources (embeddings or Claude) so one trend =
    one alert, and cross-source spread becomes a strong "this is real" signal.
 4. **More sources:** TikTok Creative Center trending hashtags, Google Trends, X/Bluesky, GitHub trending
    (great for the "building with AI" niche), and newsletters.
-5. **Daily digest** instead of (or alongside) instant pings: one 8am message with the top 3 trends + 3 ideas.
-6. **Content calendar**: ideas → scheduled slots, and a "made" status that later pulls the post's stats.
-7. **Dashboard**: bring back the React/TS dashboard from the original as a front end over this same
-   database (or expose the server over `creatorhub serve --http`).
+5. **Content calendar**: ideas → scheduled slots, and a "made" status that links to the published video
+   so its stats flow back into "My stats".
 
 ## If this becomes a SaaS again
 - Multi-tenant: Postgres instead of SQLite, a profile per user, the watcher as a queue worker.

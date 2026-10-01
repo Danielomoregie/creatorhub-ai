@@ -92,10 +92,59 @@ class TrendAssessmentBatch(BaseModel):
 
 class Alert(BaseModel):
     id: int | None = None
-    kind: Literal["trend", "adjacent_niche", "idea"]
+    kind: Literal["trend", "adjacent_niche", "idea", "digest"]
     title: str
     body: str
     trend_id: str | None = None
     url: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
     read: bool = False
+
+
+class MyVideo(BaseModel):
+    """One of the creator's own uploads."""
+
+    id: str
+    title: str
+    url: str
+    published_at: datetime
+    views: int = 0
+    likes: int = 0
+    comments: int = 0
+    tags: list[str] = Field(default_factory=list)
+
+
+class NichePerformance(BaseModel):
+    niche: str
+    videos: int
+    avg_ratio: float  # average views / channel median views
+    multiplier: float  # applied to trend relevance for this niche
+
+
+class PerformanceReport(BaseModel):
+    channel_id: str
+    videos_analyzed: int
+    median_views: int
+    niches: list[NichePerformance] = Field(default_factory=list)
+    top: list[MyVideo] = Field(default_factory=list)
+    bottom: list[MyVideo] = Field(default_factory=list)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+    def multipliers(self) -> dict[str, float]:
+        return {n.niche: n.multiplier for n in self.niches}
+
+    def summary_for_prompt(self) -> str:
+        lines = [f"Channel median views: {self.median_views}."]
+        for n in self.niches:
+            lines.append(f"- {n.niche}: {n.videos} videos, {n.avg_ratio:.1f}x median")
+        if self.top:
+            lines.append("Best performers: " + "; ".join(f'"{v.title}" ({v.views} views)' for v in self.top[:5]))
+        if self.bottom:
+            lines.append("Weakest: " + "; ".join(f'"{v.title}" ({v.views} views)' for v in self.bottom[:3]))
+        return "\n".join(lines)
+
+
+class Digest(BaseModel):
+    date: str
+    trends: list[dict] = Field(default_factory=list)
+    ideas: list[dict] = Field(default_factory=list)

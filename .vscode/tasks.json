@@ -1,0 +1,53 @@
+{
+  // Terminal > Run Task... (or Ctrl+Shift+P > "Tasks: Run Task")
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CreatorHub: open dashboard",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m creatorhub.cli dashboard",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "CreatorHub: start background watcher",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m creatorhub.cli watch",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "CreatorHub: scan once",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m creatorhub.cli scan",
+      "problemMatcher": []
+    },
+    {
+      "label": "CreatorHub: preview today's digest",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m creatorhub.cli digest --preview",
+      "problemMatcher": []
+    },
+    {
+      "label": "CreatorHub: pull my YouTube stats",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m creatorhub.cli stats",
+      "problemMatcher": []
+    },
+    {
+      "label": "CreatorHub: run tests",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m pytest",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Dashboard: dev mode (hot reload)",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/dashboard" },
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

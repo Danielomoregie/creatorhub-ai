@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 
-from .models import Alert, ContentIdea, TrendItem
+from .models import Alert, ContentIdea, MyVideo, TrendItem
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS trends (
@@ -44,6 +44,25 @@ CREATE TABLE IF NOT EXISTS ideas (
     status TEXT NOT NULL DEFAULT 'new',  -- new | saved | made | dismissed
     notion_page_id TEXT,
     data TEXT NOT NULL
+);
+
+-- Small key/value bag: last scan time, last digest date, cached performance report...
+CREATE TABLE IF NOT EXISTS kv (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- The creator's own uploads, for learning what works for *their* audience.
+CREATE TABLE IF NOT EXISTS my_videos (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    published_at TEXT NOT NULL,
+    views INTEGER DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    comments INTEGER DEFAULT 0,
+    tags TEXT,
+    fetched_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS alerts (
@@ -190,3 +209,44 @@ class Store:
             else:
                 cur = c.execute("UPDATE alerts SET read=1 WHERE read=0")
             return cur.rowcount
+
+    # ---- kv -----------------------------------------------------------------
+
+    def get_kv(self, key: str, default: str | None = None) -> str | None:
+        row = self._conn.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else default
+
+    def set_kv(self, key: str, value: str) -> None:
+        with self.tx() as c:
+            c.execute("INSERT INTO kv VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+
+    # ---- my videos ----------------------------------------------------------
+
+    def upsert_videos(self, videos: list[MyVideo]) -> None:
+        now = _now()
+        with self.tx() as c:
+            c.executemany(
+                """INSERT INTO my_videos VALUES (?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(id) DO UPDATE SET title=excluded.title, views=excluded.views,
+                       likes=excluded.likes, comments=excluded.comments, tags=excluded.tags,
+                       fetched_at=excluded.fetched_at""",
+                [(v.id, v.title, v.url, v.published_at.isoformat(), v.views, v.likes, v.comments,
+                  json.dumps(v.tags), now) for v in videos],
+            )
+
+    def list_videos(self) -> list[MyVideo]:
+        rows = self._conn.execute("SELECT * FROM my_videos ORDER BY published_at DESC").fetchall()
+        return [MyVideo(id=r["id"], title=r["title"], url=r["url"],
+                        published_at=datetime.fromisoformat(r["published_at"]), views=r["views"],
+                        likes=r["likes"], comments=r["comments"], tags=json.loads(r["tags"] or "[]"))
+                for r in rows]
+
+    def counts(self) -> dict:
+        one = lambda q, *a: self._conn.execute(q, a).fetchone()[0]  # noqa: E731
+        since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        return {
+            "trends_24h": one("SELECT COUNT(*) FROM trends WHERE first_seen_at >= ?", since),
+            "unread_alerts": one("SELECT COUNT(*) FROM alerts WHERE read=0"),
+            "ideas": one("SELECT COUNT(*) FROM ideas WHERE status != 'dismissed'"),
+            "ideas_made": one("SELECT COUNT(*) FROM ideas WHERE status = 'made'"),
+        }

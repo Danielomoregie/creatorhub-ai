@@ -16,11 +16,9 @@ import anyio.to_thread
 
 from mcp.server.mcpserver import MCPServer
 
-from . import watcher
+from . import service, watcher
 from .config import Settings, init_home, load_profile
-from .llm import Brain
 from .models import ContentIdea
-from .notion import Notion
 from .store import Store
 
 log = logging.getLogger(__name__)
@@ -34,11 +32,6 @@ def settings() -> Settings:
 @lru_cache
 def store() -> Store:
     return Store(settings().db_path)
-
-
-def brain() -> Brain | None:
-    s = settings()
-    return Brain(s.model, s.anthropic_api_key) if s.anthropic_api_key else None
 
 
 @asynccontextmanager
@@ -117,29 +110,31 @@ def scan_now() -> dict:
 @mcp.tool()
 def generate_ideas(count: int = 3, niche: str | None = None, platform: str | None = None,
                    direction: str | None = None) -> dict:
-    """Pitch content ideas grounded in current trends.
+    """Pitch content ideas grounded in current trends and in what has worked on the creator's channel.
 
     With ANTHROPIC_API_KEY set, CreatorHub writes and saves the ideas itself. Without it, this
-    returns the trend context and you (the assistant) should write the ideas, then call save_idea
+    returns the context and you (the assistant) should write the ideas, then call save_idea
     for the ones the user wants to keep.
     """
-    trends = store().top_trends(limit=10, hours=96, niche=niche)
-    b = brain()
-    if b is None:
-        return {"mode": "context_only", "profile": get_profile(), "trends": trends,
+    try:
+        return {"mode": "generated",
+                "ideas": service.generate_ideas(settings(), store(), count, niche, platform, direction)}
+    except service.NotConfigured:
+        perf = service.load_performance(store())
+        return {"mode": "context_only", "profile": get_profile(),
+                "trends": store().top_trends(limit=10, hours=96, niche=niche),
+                "my_performance": perf.summary_for_prompt() if perf else None,
                 "instructions": f"Write {count} ideas" + (f" for {platform}" if platform else "")
                                 + (f". Direction: {direction}" if direction else "")}
-    ideas = b.generate_ideas(load_profile(settings()), trends, count=count, platform=platform, extra=direction)
-    return {"mode": "generated", "ideas": [{"id": store().add_idea(i), **i.model_dump()} for i in ideas]}
 
 
 @mcp.tool()
 def save_idea(title: str, format: str, hook: str, angle: str, outline: list[str], niche: str,
               source_trend_ids: list[str] | None = None) -> dict:
     """Save an idea to the backlog."""
-    idea = ContentIdea(title=title, format=format, hook=hook, angle=angle, outline=outline,
-                       niche=niche, source_trend_ids=source_trend_ids or [])
-    return {"id": store().add_idea(idea), **idea.model_dump()}
+    return service.save_idea(store(), ContentIdea(title=title, format=format, hook=hook, angle=angle,
+                                                  outline=outline, niche=niche,
+                                                  source_trend_ids=source_trend_ids or []))
 
 
 @mcp.tool()
@@ -157,17 +152,28 @@ def update_idea_status(idea_id: int, status: Literal["new", "saved", "made", "di
 @mcp.tool()
 def send_idea_to_notion(idea_id: int) -> str:
     """Create a page for this idea in the user's Notion content database."""
-    s = settings()
-    if not (s.notion_token and s.notion_database_id):
-        return "Notion isn't configured. Set NOTION_TOKEN and NOTION_DATABASE_ID in ~/.creatorhub/.env."
-    found = store().get_idea(idea_id)
-    if not found:
-        return f"no idea with id {idea_id}"
-    idea, _row = found
-    trends = store().get_trends(idea.source_trend_ids[:1])
-    page_id = Notion(s.notion_token, s.notion_database_id).save_idea(idea, trends[0]["url"] if trends else None)
-    store().set_idea_status(idea_id, "saved", notion_page_id=page_id)
-    return f"Saved to Notion (page {page_id})."
+    try:
+        return f"Saved to Notion (page {service.send_idea_to_notion(settings(), store(), idea_id)})."
+    except (service.NotConfigured, KeyError) as e:
+        return str(e)
+
+
+# ---- digest & performance ------------------------------------------------------
+
+@mcp.tool()
+def get_digest() -> dict:
+    """Today's digest: top 3 trends and 3 ideas (from the backlog; does not spend API calls)."""
+    return service.build_digest(settings(), store(), generate=False).model_dump()
+
+
+@mcp.tool()
+def get_my_performance(refresh: bool = False) -> dict:
+    """How the creator's own YouTube videos perform per niche (vs channel median), plus best and worst videos."""
+    try:
+        report = service.refresh_performance(settings(), store()) if refresh else service.load_performance(store())
+    except service.NotConfigured as e:
+        return {"error": str(e)}
+    return report.model_dump(mode="json") if report else {"error": "No stats yet. Call again with refresh=true."}
 
 
 # ---- profile ------------------------------------------------------------------
@@ -175,17 +181,8 @@ def send_idea_to_notion(idea_id: int) -> str:
 @mcp.tool()
 def add_niche(name: str, keywords: list[str]) -> str:
     """Start tracking a new niche (e.g. after an adjacent-niche alert the user wants to pursue)."""
-    s = settings()
-    path = init_home(s)
-    if any(n.name.lower() == name.lower() for n in load_profile(s).niches):
+    if not service.add_niche(settings(), name, keywords):
         return f"Already tracking '{name}'."
-    quoted = ", ".join('"' + k.replace('"', "'") + '"' for k in keywords)
-    block = f'\n[[niches]]\nname = "{name.replace(chr(34), chr(39))}"\nkeywords = [{quoted}]\n'
-    text = path.read_text()
-    # [[niches]] must come before the [sources] table in TOML, so insert there.
-    idx = text.find("\n[sources]")
-    path.write_text(text[:idx] + block + text[idx:] if idx != -1 else text + block)
-    load_profile(s)  # validate
     return f"Now tracking '{name}' ({len(keywords)} keywords). The next scan will include it."
 
 

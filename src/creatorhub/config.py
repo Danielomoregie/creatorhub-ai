@@ -35,6 +35,8 @@ class Settings:
     profile_path: Path
     anthropic_api_key: str | None
     youtube_api_key: str | None
+    youtube_channel_id: str | None
+    digest_hour: int | None
     notion_token: str | None
     notion_database_id: str | None
     ntfy_topic: str | None
@@ -56,6 +58,9 @@ class Settings:
             profile_path=home / "profile.toml",
             anthropic_api_key=env("ANTHROPIC_API_KEY") or None,
             youtube_api_key=env("YOUTUBE_API_KEY") or None,
+            youtube_channel_id=env("YOUTUBE_CHANNEL_ID") or None,
+            # Local hour (0-23) to send the daily digest; "off" disables it.
+            digest_hour=None if env("CREATORHUB_DIGEST_HOUR", "8").lower() == "off" else int(env("CREATORHUB_DIGEST_HOUR") or 8),
             notion_token=env("NOTION_TOKEN") or None,
             notion_database_id=env("NOTION_DATABASE_ID") or None,
             ntfy_topic=env("NTFY_TOPIC") or None,

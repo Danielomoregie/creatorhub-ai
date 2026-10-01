@@ -68,9 +68,12 @@ def freshness(item: TrendItem, now: datetime) -> float:
 
 
 def score_item(item: TrendItem, profile: Profile, previous: tuple[int, datetime] | None = None,
-               now: datetime | None = None) -> TrendItem:
+               now: datetime | None = None, niche_multipliers: dict[str, float] | None = None) -> TrendItem:
+    """niche_multipliers come from the creator's own channel stats (see youtube_stats)."""
     now = now or datetime.now(timezone.utc)
     rel, niche, hits = relevance(item, profile)
+    if niche and niche_multipliers:
+        rel = min(60.0, rel * niche_multipliers.get(niche, 1.0))
     item.score = round(min(100.0, rel + momentum(item, now, previous) + freshness(item, now)), 1)
     item.matched_niche = niche
     item.matched_keywords = hits
